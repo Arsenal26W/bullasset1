@@ -855,7 +855,7 @@
             modalActiveTab = tab; document.querySelectorAll('[id^="m-tab-"]').forEach(b=> { b.className="flex-1 py-3 text-xs font-bold border-b-2 border-transparent text-[#888]"; });
             const targetTab = document.getElementById('m-tab-'+tab); if(targetTab) targetTab.className="flex-1 py-3 text-xs font-bold border-b-2 border-[#ff4e4e] text-white";
             const cc = document.getElementById('modal-content'); if(!cc) return;
-            const yOptions = `2025,2026,2027,2028`.split(',').map(y=>`<option value="${y}" ${y==='2026'?'selected':''}>${y}년</option>`).join('');
+            const yOptions = `2021,2022,2023,2024,2025,2026,2027,2028`.split(',').map(y=>`<option value="${y}" ${y==='2026'?'selected':''}>${y}년</option>`).join('');
             const mOptions = Array.from({length:12},(_, i)=>String(i+1).padStart(2,'0')).map(m=>`<option value="${m}" ${m==='05'?'selected':''}>${Number(m)}월</option>`).join('');
 
             if(activeCat === 'us') {
