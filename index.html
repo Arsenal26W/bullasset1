@@ -411,14 +411,14 @@
                     const FIXED_INITIAL = 70000000;
                     let loanRepayment = Number(reSet.invest || 0);
                     let totalInvest = FIXED_INITIAL + loanRepayment;
-                    let netProfit = actualPrice - (buyPrice - Number(reSet.jeonse || 0)) - Number(reSet.loan || 0) - totalLoanInterest - totalInvest;
+                    let netProfit = actualPrice - buyPrice - taxPrice - totalLoanInterest;
                     let roiPercent = totalInvest > 0 ? ((netProfit / totalInvest) * 100).toFixed(1) : '0.0';
                     let isPlus = netProfit >= 0;
 
                     vp.innerHTML = `
                         <div class="grid grid-cols-2 gap-3">
                             <div class="bull-card p-4"><div class="text-[10px] text-[#888] mb-1">구매금액</div><div class="text-base font-black text-white">₩ ${buyPrice.toLocaleString()}</div><div class="text-[9px] text-[#666] mt-1">취득세: ₩ ${taxPrice.toLocaleString()}</div></div>
-                            <div class="bull-card p-4 relative"><div class="text-[10px] text-[#888] mb-1">전세금액</div><div class="text-base font-black text-white">₩ ${Number(reSet.jeonse || 0).toLocaleString()}</div><button onclick="editREField('jeonse')" class="absolute top-3 right-3 text-xs text-[#aaa] active:text-[#fff]"><i class="fa-solid fa-pen"></i></button></div>
+                            <div class="bull-card p-4 relative"><div class="text-[10px] text-[#888] mb-1">전세금액</div><div class="text-base font-black text-white">₩ ${Number(reSet.jeonse || 0).toLocaleString()}</div><div class="text-[9px] text-[#666] mt-1">증액분(수익현금화): ₩ ${(Number(reSet.jeonse || 0) - 270000000).toLocaleString()}</div><button onclick="editREField('jeonse')" class="absolute top-3 right-3 text-xs text-[#aaa] active:text-[#fff]"><i class="fa-solid fa-pen"></i></button></div>
                             <div class="bull-card p-4 relative"><div class="text-[10px] text-[#888] mb-1">대출액</div><div class="text-base font-black text-white">₩ ${Number(reSet.loan || 0).toLocaleString()}</div><button onclick="editREField('loan')" class="absolute top-3 right-3 text-xs text-[#aaa] active:text-[#fff]"><i class="fa-solid fa-pen"></i></button></div>
                             <div class="bull-card p-4"><div class="text-[10px] text-[#888] mb-1">대출이자</div><div class="text-base font-black text-white">₩ ${totalLoanInterest.toLocaleString()}</div></div>
                             <div class="bull-card p-4 col-span-2 relative">
