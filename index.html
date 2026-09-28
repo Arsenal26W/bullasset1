@@ -55,6 +55,8 @@
         .bull-card { background-color: #1a1a1a; border: 1px solid #2d2d2d; border-radius: 16px; }
         .grey-box { background-color: #2d2d2d; color: #fff; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 700; display: inline-block; }
         .red-roi-badge { background-color: #ff4e4e; color: #fff; padding: 6px 12px; border-radius: 10px; font-weight: 900; font-size: 16px; }
+        .info-dot { display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; border: 1px solid currentColor; border-radius: 9999px; font-size: 9px; font-weight: 700; line-height: 1; }
+        .info-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: max-content; max-width: 240px; background: #2d2d2d; border: 1px solid #3d3d3d; color: #ddd; font-size: 10px; font-weight: 500; line-height: 1.45; padding: 6px 10px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.45); }
         .blue-roi-badge { background-color: #38bdf8; color: #fff; padding: 6px 12px; border-radius: 10px; font-weight: 900; font-size: 16px; }
 
         /* 로딩 오버레이 */
@@ -146,6 +148,16 @@
             </div>
             <div id="modal-tab-bar" class="flex border-b border-[#2d2d2d]"></div>
             <div id="modal-content" class="py-2 max-h-[60vh] overflow-y-auto no-scrollbar"></div>
+        </div>
+    </div>
+
+    <div id="mini-modal" class="fixed inset-0 bg-black/90 flex items-end justify-center z-50 hidden">
+        <div class="bg-[#1a1a1a] w-full rounded-t-3xl p-6 space-y-5 animate-in slide-in-from-bottom duration-300">
+            <div class="flex justify-between items-center">
+                <h3 id="mini-modal-title" class="text-lg font-black flex items-center gap-2"></h3>
+                <button onclick="closeMiniModal()" class="text-[#888] text-2xl font-bold p-2">&times;</button>
+            </div>
+            <div id="mini-modal-content" class="py-2"></div>
         </div>
     </div>
 
@@ -249,7 +261,7 @@
         // ═══════════════════════════════════════════════════════
 
         const KEYS = {
-            us: { inv: 'B_INV_US', bal: 'B_BAL_US', int: 'B_INT_US' },
+            us: { inv: 'B_INV_US', bal: 'B_BAL_US', int: 'B_INT_US', tax: 'B_TAX_US' },
             kr: { inv: 'B_INV_KR', bal: 'B_BAL_KR' },
             pension: { inv: 'B_INV_PEN', bal: 'B_BAL_PEN' },
             re: { settings: 'B_RE_SET', loan: 'B_LOAN_RE' }
@@ -324,7 +336,9 @@
             if(activeCat === 're') {
                 bar.innerHTML = `<button onclick="switchSubTab('status')" id="sub-tab-status" class="px-5 py-2.5 rounded-full text-xs bg-[#ff4e4e] text-white font-bold whitespace-nowrap">📊 현황표</button><button onclick="switchSubTab('loan')" id="sub-tab-loan" class="px-5 py-2.5 rounded-full text-xs bg-[#1a1a1a] text-[#888] font-bold whitespace-nowrap">💸 대출이자</button>`;
             } else {
-                bar.innerHTML = `<button onclick="switchSubTab('status')" id="sub-tab-status" class="px-5 py-2.5 rounded-full text-xs bg-[#ff4e4e] text-white font-bold whitespace-nowrap">📊 현황표</button><button onclick="switchSubTab('periodic')" id="sub-tab-periodic" class="px-5 py-2.5 rounded-full text-xs bg-[#1a1a1a] text-[#888] font-bold whitespace-nowrap">📈 집계표</button>${activeCat === 'us' ? '<button onclick="switchSubTab(\'interest\')" id="sub-tab-interest" class="px-5 py-2.5 rounded-full text-xs bg-[#1a1a1a] text-[#888] font-bold whitespace-nowrap">💸 은행이자</button>' : ''}`;
+                // 미국은 탭이 4개라 좌우 여백을 조금 줄여 한 화면에 들어오게 함
+                const px = activeCat === 'us' ? 'px-3.5' : 'px-5';
+                bar.innerHTML = `<button onclick="switchSubTab('status')" id="sub-tab-status" class="${px} py-2.5 rounded-full text-xs bg-[#ff4e4e] text-white font-bold whitespace-nowrap">📊 현황표</button><button onclick="switchSubTab('periodic')" id="sub-tab-periodic" class="${px} py-2.5 rounded-full text-xs bg-[#1a1a1a] text-[#888] font-bold whitespace-nowrap">📈 집계표</button>${activeCat === 'us' ? `<button onclick="switchSubTab('interest')" id="sub-tab-interest" class="${px} py-2.5 rounded-full text-xs bg-[#1a1a1a] text-[#888] font-bold whitespace-nowrap">💸 은행이자</button><button onclick="switchSubTab('tax')" id="sub-tab-tax" class="${px} py-2.5 rounded-full text-xs bg-[#1a1a1a] text-[#888] font-bold whitespace-nowrap">🧾 세금</button>` : ''}`;
             }
         }
 
@@ -406,42 +420,94 @@
                 else if(activeCat === 're') {
                     const reSet = JSON.parse(DB.get(KEYS.re.settings)) || {jeonse:0, loan:0, actual:0, invest:0};
                     const reLoans = JSON.parse(DB.get(KEYS.re.loan)) || [];
-                    let totalLoanInterest = reLoans.reduce((s,x)=>s+Number(x.total || 0), 0);
-                    let buyPrice = 660000000; let taxPrice = 10164000; let actualPrice = Number(reSet.actual || buyPrice);
-                    const FIXED_INITIAL = 70000000;
-                    let loanRepayment = Number(reSet.invest || 0);
-                    let totalInvest = FIXED_INITIAL + loanRepayment;
-                    let netProfit = actualPrice - buyPrice - taxPrice - totalLoanInterest;
-                    let roiPercent = totalInvest > 0 ? ((netProfit / totalInvest) * 100).toFixed(1) : '0.0';
-                    let isPlus = netProfit >= 0;
+                    const totalLoanInterest = reLoans.reduce((s,x)=>s+Number(x.total || 0), 0);
+                    const buyPrice = 660000000; const taxPrice = 10164000;
+                    const INITIAL_CAPITAL = 55000000;      // 초기자금
+                    const CAPITAL_RECOVERED = 100000000;   // 자본회수액
+                    const BUY_DATE = '2021-08-25';         // 매수일 (CAGR 보유기간 시작일)
+                    const jeonse = Number(reSet.jeonse || 0);
+                    const loanAmt = Number(reSet.loan || 0);
+                    const actualPrice = Number(reSet.actual || buyPrice);
+
+                    // 순 수익 = 실거래가 - 구매금액 - 취득세 - 대출이자
+                    const netProfit = actualPrice - buyPrice - taxPrice - totalLoanInterest;
+                    // 순자산 = 실거래가 - 전세금액 - 대출액
+                    const netAsset = actualPrice - jeonse - loanAmt;
+                    // 순 투입 자기자본 = 순자산 - 순 수익
+                    const netEquity = netAsset - netProfit;
+                    // 총 투입원금 = 순 투입 자기자본 + 자본회수액
+                    const totalPrincipal = netEquity + CAPITAL_RECOVERED;
+                    const isPlus = netProfit >= 0;
+                    const accentCls = isPlus ? 'text-[#ff4e4e]' : 'text-sky-400';
+
+                    // CAGR용 보유기간(년): 매수일 ~ 오늘
+                    const holdYears = Math.max(0, (Date.now() - new Date(BUY_DATE + 'T00:00:00').getTime()) / (365.25 * 24 * 3600 * 1000));
+
+                    const roiRows = [
+                        { label: '총 투입원금', base: totalPrincipal },
+                        { label: '순 투입 자기자본', base: netEquity },
+                        { label: '초기자금', base: INITIAL_CAPITAL }
+                    ].map(r => {
+                        const roi = r.base > 0 ? (netProfit / r.base) * 100 : null;
+                        return { ...r, roi, cagr: calcCAGR(roi, holdYears) };
+                    });
+                    const maxAbsRoi = Math.max(0.0001, ...roiRows.map(r => r.roi === null ? 0 : Math.abs(r.roi)));
+                    const roiRowsHtml = roiRows.map(r => {
+                        const c = r.roi === null ? '#666' : (r.roi >= 0 ? '#ff4e4e' : '#38bdf8');
+                        const w = r.roi === null ? 0 : Math.max(3, Math.abs(r.roi) / maxAbsRoi * 100);
+                        return `
+                            <div class="flex items-center gap-3">
+                                <span class="w-[92px] shrink-0 text-[11px] font-bold text-[#aaa] whitespace-nowrap">${r.label}</span>
+                                <div class="flex-1 h-1 rounded-full overflow-hidden" style="background:rgba(255,255,255,.06)"><div class="h-full rounded-full" style="width:${w}%;background:${c};opacity:.75"></div></div>
+                                <div class="inline-flex items-start shrink-0">
+                                    <span class="min-w-[60px] text-right text-base font-black leading-none" style="color:${c}">${fmtPct(r.roi)}</span>
+                                    <span class="w-[40px] ml-1 text-[9px] font-bold leading-none" style="color:${c};opacity:.7">${fmtPct(r.cagr)}</span>
+                                </div>
+                            </div>`;
+                    }).join('');
 
                     vp.innerHTML = `
                         <div class="grid grid-cols-2 gap-3">
-                            <div class="bull-card p-4"><div class="text-[10px] text-[#888] mb-1">구매금액</div><div class="text-base font-black text-white">₩ ${buyPrice.toLocaleString()}</div><div class="text-[9px] text-[#666] mt-1">취득세: ₩ ${taxPrice.toLocaleString()}</div></div>
-                            <div class="bull-card p-4 relative"><div class="text-[10px] text-[#888] mb-1">전세금액</div><div class="text-base font-black text-white">₩ ${Number(reSet.jeonse || 0).toLocaleString()}</div><div class="text-[9px] text-[#666] mt-1">증액분(수익현금화): ₩ ${(Number(reSet.jeonse || 0) - 270000000).toLocaleString()}</div><button onclick="editREField('jeonse')" class="absolute top-3 right-3 text-xs text-[#aaa] active:text-[#fff]"><i class="fa-solid fa-pen"></i></button></div>
-                            <div class="bull-card p-4 relative"><div class="text-[10px] text-[#888] mb-1">대출액</div><div class="text-base font-black text-white">₩ ${Number(reSet.loan || 0).toLocaleString()}</div><button onclick="editREField('loan')" class="absolute top-3 right-3 text-xs text-[#aaa] active:text-[#fff]"><i class="fa-solid fa-pen"></i></button></div>
+                            <div class="bull-card p-4"><div class="text-[10px] text-[#888] mb-1">구매금액</div><div class="text-base font-black text-white">₩ ${buyPrice.toLocaleString()}</div><div class="text-[9px] text-[#666] mt-1">취득세: ₩ ${taxPrice.toLocaleString()}</div><div class="text-[9px] text-[#666] mt-0.5">초기자금: ₩ ${INITIAL_CAPITAL.toLocaleString()}</div></div>
+                            <div class="bull-card p-4 relative"><div class="text-[10px] text-[#888] mb-1">전세금액</div><div class="text-base font-black text-white">₩ ${jeonse.toLocaleString()}</div><button onclick="editREField('jeonse')" class="absolute top-3 right-3 text-xs text-[#aaa] active:text-[#fff]"><i class="fa-solid fa-pen"></i></button></div>
+                            <div class="bull-card p-4 relative"><div class="text-[10px] text-[#888] mb-1">대출액</div><div class="text-base font-black text-white">₩ ${loanAmt.toLocaleString()}</div><button onclick="editREField('loan')" class="absolute top-3 right-3 text-xs text-[#aaa] active:text-[#fff]"><i class="fa-solid fa-pen"></i></button></div>
                             <div class="bull-card p-4"><div class="text-[10px] text-[#888] mb-1">대출이자</div><div class="text-base font-black text-white">₩ ${totalLoanInterest.toLocaleString()}</div></div>
-                            <div class="bull-card p-4 col-span-2 relative">
-                                <button onclick="editREField('invest')" class="absolute top-3 right-3 text-xs text-[#aaa] active:text-[#fff]"><i class="fa-solid fa-pen"></i></button>
-                                <div class="text-[10px] text-[#888] mb-2">투입자금</div>
+                            <div class="bull-card p-4 relative"><div class="text-[10px] text-[#888] mb-1">실거래가</div><div class="text-base font-black text-white">₩ ${actualPrice.toLocaleString()}</div><button onclick="editREField('actual')" class="absolute top-3 right-3 text-xs text-[#aaa] active:text-[#fff]"><i class="fa-solid fa-pen"></i></button></div>
+                            <div class="bull-card p-4"><div class="text-[10px] text-[#888] mb-1">순자산</div><div class="text-base font-black text-white">₩ ${netAsset.toLocaleString()}</div></div>
+                            <div class="bull-card p-4 col-span-2">
+                                <div class="relative inline-flex items-center gap-1.5 mb-2 text-[#888]">
+                                    <span class="text-[10px]">순 투입 자기자본</span>
+                                    <button type="button" onclick="toggleInfoPop('pop-equity', event)" class="p-1 -m-1" aria-label="순 투입 자기자본 설명"><span class="info-dot">i</span></button>
+                                    <div id="pop-equity" class="info-pop hidden">수익과 무관한 순수 투입비용(순자산-순수익)</div>
+                                </div>
                                 <div class="flex items-center gap-4">
-                                    <div class="text-lg font-black text-white">₩ ${totalInvest.toLocaleString()}</div>
+                                    <div class="text-lg font-black text-white">₩ ${netEquity.toLocaleString()}</div>
                                     <div class="ml-auto flex flex-col gap-1 text-right">
                                         <div class="flex items-center justify-end gap-2">
-                                            <span class="text-[10px] text-[#888]">초기자금</span>
-                                            <span class="text-[11px] font-bold text-[#aaa]">₩ ${FIXED_INITIAL.toLocaleString()}</span>
+                                            <span class="text-[10px] text-[#888]">자본회수액</span>
+                                            <span class="text-[11px] font-bold text-[#aaa]">₩ ${CAPITAL_RECOVERED.toLocaleString()}</span>
                                         </div>
                                         <div class="flex items-center justify-end gap-2">
-                                            <span class="text-[10px] text-[#888]">대출상환</span>
-                                            <span class="text-[11px] font-bold text-[#aaa]">₩ ${loanRepayment.toLocaleString()}</span>
+                                            <span class="text-[10px] text-[#888]">총 투입원금</span>
+                                            <span class="text-[11px] font-bold text-[#aaa]">₩ ${totalPrincipal.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="bull-card p-4 col-span-2 relative"><div class="text-[10px] text-[#888] mb-1">실거래가</div><div class="text-lg font-black text-white">₩ ${actualPrice.toLocaleString()}</div><button onclick="editREField('actual')" class="absolute top-4 right-4 text-xs text-[#aaa] active:text-[#fff]"><i class="fa-solid fa-pen"></i></button></div>
-                            <div class="bull-card p-5 col-span-2 ${isPlus ? 'bg-gradient-to-br from-[#1a1a1a] to-[#251414]' : 'bg-gradient-to-br from-[#1a1a1a] to-[#141d25]'} flex justify-between items-center">
-                                <div><div class="text-[11px] ${isPlus ? 'text-[#ff4e4e]' : 'text-sky-400'} mb-1 font-bold">순 누적수익</div><div class="text-2xl font-black ${isPlus ? 'text-[#ff4e4e]' : 'text-sky-400'}">${isPlus ? '+' : ''}₩ ${netProfit.toLocaleString()}</div></div>
-                                <div class="${isPlus ? 'red-roi-badge' : 'blue-roi-badge'}">${isPlus ? '+' : ''}${roiPercent}%</div>
+                            <div class="bull-card p-5 col-span-2 relative ${isPlus ? 'bg-gradient-to-br from-[#1a1a1a] to-[#251414]' : 'bg-gradient-to-br from-[#1a1a1a] to-[#141d25]'}">
+                                <div class="relative inline-flex items-center gap-1.5 mb-1 ${accentCls}">
+                                    <span class="text-[11px] font-bold">순 수익</span>
+                                    <button type="button" onclick="toggleInfoPop('pop-profit', event)" class="p-1 -m-1 opacity-80" aria-label="순 수익 설명"><span class="info-dot">i</span></button>
+                                    <div id="pop-profit" class="info-pop hidden">(실거래가-구매금액-취득세-대출이자)</div>
+                                </div>
+                                <div class="text-2xl font-black ${accentCls}">${isPlus ? '+' : ''}₩ ${netProfit.toLocaleString()}</div>
+                                <div class="mt-4 pt-3.5 border-t border-[#2d2d2d] space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[10px] font-bold text-[#888]">기준별 수익률</span>
+                                        <span class="text-[9px] text-[#888]">CAGR (보유 ${holdYears.toFixed(1)}년)</span>
+                                    </div>
+                                    ${roiRowsHtml}
+                                </div>
                             </div>
                         </div>
                     `;
@@ -466,6 +532,9 @@
                     <div id="periodic-chart-viewport" class="bull-card p-4 hidden"><div class="h-64 w-full relative"><canvas id="roiLineChart"></canvas></div></div>
                 `;
                 renderPeriodicData();
+            }
+            else if(activeTab === 'tax') {
+                renderUSTaxView();
             }
             else if(activeTab === 'interest' || activeTab === 'loan') {
                 let currentSrc = activeTab === 'loan' ? JSON.parse(DB.get(KEYS.re.loan)) || [] : int;
@@ -822,6 +891,76 @@
             }
         }
 
+        // ── 미국 세금 탭 (다른 탭·카테고리 계산에 영향 없음) ──
+        function readTaxList() {
+            try {
+                const v = DB.get(KEYS.us.tax);
+                const arr = v ? JSON.parse(v) : [];
+                return Array.isArray(arr) ? arr : [];
+            } catch(e) { return []; }
+        }
+
+        function renderUSTaxView() {
+            const vp = document.getElementById('main-viewport'); if(!vp) return;
+            const list = readTaxList();
+            const total = list.reduce((s,x)=>s+Number(x.krw||0),0);
+            const sorted = [...list].sort((a,b)=>Number(b.year)-Number(a.year));
+            const itemsHtml = sorted.length > 0
+                ? sorted.map(x => `<div class="bg-[#222] p-4 rounded-xl border border-[#2d2d2d] flex justify-between items-center text-xs"><span class="grey-box">${x.year}년</span><div class="flex items-center gap-3"><span class="font-bold text-white text-sm">₩ ${Number(x.krw||0).toLocaleString()}</span><button onclick="deleteTaxRecord('${x.year}')" class="text-[#555] p-1 text-sm active:text-red-500"><i class="fa-solid fa-trash-can"></i></button></div></div>`).join('')
+                : `<div class="text-center text-xs text-[#666] py-8">기록된 세금이 없습니다. 합계 박스의 아이콘을 눌러 입력해 주세요.</div>`;
+            vp.innerHTML = `
+                <div class="bull-card p-4 relative">
+                    <div class="text-[10px] text-[#ff4e4e] mb-1 font-bold text-center">납부 세금 합계</div>
+                    <div class="text-xl font-black text-white text-center">₩ ${total.toLocaleString()}</div>
+                    <button onclick="openTaxInput()" title="양도세 입력" class="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 rounded-xl bg-[#252525] border border-[#3d3d3d] text-[#aaa] text-sm flex items-center justify-center active:bg-[#333] active:text-white transition-all"><i class="fa-solid fa-file-invoice-dollar"></i></button>
+                </div>
+                <div class="bull-card p-4 space-y-3">
+                    <h3 class="text-sm font-bold mb-2">세금 내역</h3>
+                    ${itemsHtml}
+                </div>
+            `;
+        }
+
+        function openTaxInput() {
+            const T = getToday();
+            openMiniModal('🧾 양도세 기록', `
+                <form onsubmit="handleTaxSubmit(event)" class="space-y-4">
+                    <div><label class="block text-[10px] text-[#888] mb-1 pl-1">연도</label><select id="t-year" class="w-full p-4">${buildYearOptions(T.y)}</select></div>
+                    <div><label class="block text-[10px] text-[#888] mb-1 pl-1">양도세 (₩)</label><input type="text" id="t-amount" inputmode="numeric" placeholder="원화입력" required class="w-full p-4" oninput="formatComma(this)"></div>
+                    <button class="w-full bg-[#ff4e4e] py-4 rounded-xl font-black text-white">기록 저장</button>
+                </form>
+            `);
+        }
+
+        function handleTaxSubmit(e) {
+            e.preventDefault();
+            const y = document.getElementById('t-year').value;
+            const amt = parseNum(document.getElementById('t-amount').value || 0);
+            let list = readTaxList();
+            list = list.filter(x => String(x.year) !== y);   // 같은 연도는 새 금액으로 교체
+            list.push({ year: y, krw: amt });
+            DB.set(KEYS.us.tax, JSON.stringify(list));
+            triggerSaveFeedback(); closeMiniModal(); renderMainViewport();
+        }
+
+        function deleteTaxRecord(year) {
+            if(!confirm("해당 원장 기록을 지우시겠습니까?")) return;
+            let list = readTaxList();
+            list = list.filter(x => String(x.year) !== String(year));
+            DB.set(KEYS.us.tax, JSON.stringify(list)); renderMainViewport();
+        }
+
+        // ── 작은 입력창 (세금 입력) ──
+        function openMiniModal(title, html) {
+            document.getElementById('mini-modal-title').innerHTML = title;
+            document.getElementById('mini-modal-content').innerHTML = html;
+            document.getElementById('mini-modal').classList.remove('hidden');
+        }
+        function closeMiniModal() {
+            document.getElementById('mini-modal').classList.add('hidden');
+            document.getElementById('mini-modal-content').innerHTML = '';
+        }
+
         function editREField(field) {
             const current = JSON.parse(DB.get(KEYS.re.settings)) || {jeonse:0, loan:0, actual:0, invest:0};
             const labels = {jeonse:'전세금액', loan:'대출액', actual:'실거래가', invest:'대출상환 금액'};
@@ -835,7 +974,10 @@
         }
 
         function openModal() {
+            // 새로 열 때는 이전 입력값을 넘겨받지 않음 (날짜=오늘, 금액=빈칸)
             modalDraft = {};
+            modalActiveTab = '';
+            document.getElementById('modal-content').innerHTML = '';
             document.getElementById('input-modal').classList.remove('hidden');
             const catTitle = activeCat==='us'?'미국주식':(activeCat==='kr'?'한국주식':(activeCat==='pension'?'연금':'부동산'));
             document.getElementById('modal-cat-title').innerText = catTitle;
@@ -880,12 +1022,13 @@
             modalActiveTab = tab; document.querySelectorAll('[id^="m-tab-"]').forEach(b=> { b.className="flex-1 py-3 text-xs font-bold border-b-2 border-transparent text-[#888]"; });
             const targetTab = document.getElementById('m-tab-'+tab); if(targetTab) targetTab.className="flex-1 py-3 text-xs font-bold border-b-2 border-[#ff4e4e] text-white";
             const cc = document.getElementById('modal-content'); if(!cc) return;
-            const yOptions = `2021,2022,2023,2024,2025,2026,2027,2028`.split(',').map(y=>`<option value="${y}" ${y==='2026'?'selected':''}>${y}년</option>`).join('');
-            const mOptions = Array.from({length:12},(_, i)=>String(i+1).padStart(2,'0')).map(m=>`<option value="${m}" ${m==='05'?'selected':''}>${Number(m)}월</option>`).join('');
+            const T = getToday();   // 날짜·연월 기본값 = 오늘
+            const yOptions = buildYearOptions(T.y);
+            const mOptions = buildMonthOptions(T.m);
 
             if(activeCat === 'us') {
                 if(tab === 'invest') {
-                    cc.innerHTML = `<form onsubmit="handleFormSubmit(event)" class="space-y-4"><input type="date" id="f-date" required class="w-full p-4"><div class="grid grid-cols-2 gap-2"><div><label class="block text-[10px] text-[#888] mb-1">한화 투입액 (₩)</label><input type="text" id="f-krw" placeholder="원화입력" required class="w-full p-4" oninput="formatComma(this)"></div><div><label class="block text-[10px] text-[#888] mb-1">달러 환전액 ($)</label><input type="text" id="f-usd" placeholder="달러입력" required class="w-full p-4" oninput="formatComma(this)"></div></div><button class="w-full bg-[#ff4e4e] py-4 rounded-xl font-black text-white">기록 저장</button></form>`;
+                    cc.innerHTML = `<form onsubmit="handleFormSubmit(event)" class="space-y-4"><input type="date" id="f-date" required class="w-full p-4" value="${T.date}"><div class="grid grid-cols-2 gap-2"><div><label class="block text-[10px] text-[#888] mb-1">한화 투입액 (₩)</label><input type="text" id="f-krw" placeholder="원화입력" required class="w-full p-4" oninput="formatComma(this)"></div><div><label class="block text-[10px] text-[#888] mb-1">달러 환전액 ($)</label><input type="text" id="f-usd" placeholder="달러입력" required class="w-full p-4" oninput="formatComma(this)"></div></div><button class="w-full bg-[#ff4e4e] py-4 rounded-xl font-black text-white">기록 저장</button></form>`;
                 } else if(tab === 'balance') {
                     cc.innerHTML = `<form onsubmit="handleFormSubmit(event)" class="space-y-4"><div class="grid grid-cols-2 gap-2"><select id="f-year" class="p-4">${yOptions}</select><select id="f-month" class="p-4">${mOptions}</select></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-[10px] text-[#888] mb-1">달러 계좌 잔고 ($)</label><input type="text" id="f-usd" placeholder="달러잔고" required class="w-full p-4" oninput="formatComma(this)"></div><div><label class="block text-[10px] text-[#888] mb-1">적용 고시 환율 (₩)</label><input type="text" id="f-rate" placeholder="현재환율" required class="w-full p-4" oninput="formatComma(this)"></div></div><button class="w-full bg-[#ff4e4e] py-4 rounded-xl font-black text-white">기록 저장</button></form>`;
                 } else if(tab === 'interest') {
@@ -894,14 +1037,14 @@
             } 
             else if(activeCat === 'kr') {
                 if(tab === 'invest') {
-                    cc.innerHTML = `<form onsubmit="handleFormSubmit(event)" class="space-y-4"><input type="date" id="f-date" required class="w-full p-4"><input type="text" id="f-krw" placeholder="원화입력" required class="w-full p-4" oninput="formatComma(this)"><button class="w-full bg-[#ff4e4e] py-4 rounded-xl font-black text-white">기록 저장</button></form>`;
+                    cc.innerHTML = `<form onsubmit="handleFormSubmit(event)" class="space-y-4"><input type="date" id="f-date" required class="w-full p-4" value="${T.date}"><input type="text" id="f-krw" placeholder="원화입력" required class="w-full p-4" oninput="formatComma(this)"><button class="w-full bg-[#ff4e4e] py-4 rounded-xl font-black text-white">기록 저장</button></form>`;
                 } else if(tab === 'balance') {
                     cc.innerHTML = `<form onsubmit="handleFormSubmit(event)" class="space-y-4"><div class="grid grid-cols-2 gap-2"><select id="f-year" class="p-4">${yOptions}</select><select id="f-month" class="p-4">${mOptions}</select></div><input type="text" id="f-krw" placeholder="원화 계좌잔고" required class="w-full p-4" oninput="formatComma(this)"><button class="w-full bg-[#ff4e4e] py-4 rounded-xl font-black text-white">기록 저장</button></form>`;
                 }
             }
             else if(activeCat === 'pension') {
                 if(tab === 'invest') {
-                    cc.innerHTML = `<form onsubmit="handleFormSubmit(event)" class="space-y-4"><input type="date" id="f-date" required class="w-full p-4"><div class="grid grid-cols-2 gap-2"><div><label class="block text-[10px] text-[#888] mb-1 pl-1">퇴직연금 투입액 (₩)</label><input type="text" id="f-irp" placeholder="퇴직연금" class="w-full p-4" oninput="formatComma(this)"></div><div><label class="block text-[10px] text-[#888] mb-1 pl-1">연금저축 투입액 (₩)</label><input type="text" id="f-pension" placeholder="연금저축" class="w-full p-4" oninput="formatComma(this)"></div></div><button class="w-full bg-[#ff4e4e] py-4 rounded-xl font-black text-white">기록 저장</button></form>`;
+                    cc.innerHTML = `<form onsubmit="handleFormSubmit(event)" class="space-y-4"><input type="date" id="f-date" required class="w-full p-4" value="${T.date}"><div class="grid grid-cols-2 gap-2"><div><label class="block text-[10px] text-[#888] mb-1 pl-1">퇴직연금 투입액 (₩)</label><input type="text" id="f-irp" placeholder="퇴직연금" class="w-full p-4" oninput="formatComma(this)"></div><div><label class="block text-[10px] text-[#888] mb-1 pl-1">연금저축 투입액 (₩)</label><input type="text" id="f-pension" placeholder="연금저축" class="w-full p-4" oninput="formatComma(this)"></div></div><button class="w-full bg-[#ff4e4e] py-4 rounded-xl font-black text-white">기록 저장</button></form>`;
                 } else if(tab === 'balance') {
                     cc.innerHTML = `<form onsubmit="handleFormSubmit(event)" class="space-y-4"><div class="grid grid-cols-2 gap-2"><select id="f-year" class="p-4">${yOptions}</select><select id="f-month" class="p-4">${mOptions}</select></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-[10px] text-[#888] mb-1 pl-1">퇴직연금 잔고 (₩)</label><input type="text" id="f-irp" placeholder="원화입력" required class="w-full p-4" oninput="formatComma(this)"></div><div><label class="block text-[10px] text-[#888] mb-1 pl-1">연금저축 잔고 (₩)</label><input type="text" id="f-pension" placeholder="원화입력" required class="w-full p-4" oninput="formatComma(this)"></div></div><button class="w-full bg-[#ff4e4e] py-4 rounded-xl font-black text-white">기록 저장</button></form>`;
                 }
@@ -982,7 +1125,7 @@
         }
 
         function backupAllData() {
-            let backup = {}; Object.keys(KEYS).forEach(c => { Object.keys(KEYS[c]).forEach(k => { backup[KEYS[c][k]] = DB.get(KEYS[c][k]); }); });
+            let backup = {}; Object.keys(KEYS).forEach(c => { Object.keys(KEYS[c]).forEach(k => { const v = DB.get(KEYS[c][k]); if(v !== null && v !== undefined) backup[KEYS[c][k]] = v; }); });
             const blob = new Blob([JSON.stringify(backup)], {type: 'application/json'}); const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `BULL_TOTAL_PORTFOLIO_MASTER.json`; a.click();
         }
@@ -1001,6 +1144,48 @@
                 }
             };
             reader.readAsText(file);
+        }
+
+        // CAGR = (1 + 수익률)^(1/보유년수) - 1  (보유 1년 미만이면 수익률 그대로)
+        function calcCAGR(roiPct, years) {
+            if(roiPct === null || years === null) return null;
+            const g = 1 + roiPct / 100;
+            if(g <= 0) return null;
+            if(years < 1) return roiPct;
+            return (Math.pow(g, 1 / years) - 1) * 100;
+        }
+
+        function fmtPct(v) {
+            if(v === null || !isFinite(v)) return '–';
+            return (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+        }
+
+        function toggleInfoPop(id, e) {
+            if(e) e.stopPropagation();
+            const target = document.getElementById(id);
+            const willOpen = target && target.classList.contains('hidden');
+            document.querySelectorAll('.info-pop').forEach(p => p.classList.add('hidden'));
+            if(willOpen) target.classList.remove('hidden');
+        }
+        document.addEventListener('click', () => document.querySelectorAll('.info-pop').forEach(p => p.classList.add('hidden')));
+
+        function getToday() {
+            const d = new Date();
+            const y = String(d.getFullYear());
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return { y, m, date: `${y}-${m}-${day}` };
+        }
+
+        function buildYearOptions(selY) {
+            const endY = Math.max(2028, Number(getToday().y) + 1);
+            let html = '';
+            for(let y = 2021; y <= endY; y++) html += `<option value="${y}" ${String(y)===String(selY)?'selected':''}>${y}년</option>`;
+            return html;
+        }
+
+        function buildMonthOptions(selM) {
+            return Array.from({length:12},(_, i)=>String(i+1).padStart(2,'0')).map(m=>`<option value="${m}" ${m===selM?'selected':''}>${Number(m)}월</option>`).join('');
         }
 
         function parseNum(val) {
