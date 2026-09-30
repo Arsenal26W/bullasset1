@@ -55,7 +55,10 @@
         .bull-card { background-color: #1a1a1a; border: 1px solid #2d2d2d; border-radius: 16px; }
         .grey-box { background-color: #2d2d2d; color: #fff; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 700; display: inline-block; }
         .red-roi-badge { background-color: #ff4e4e; color: #fff; padding: 6px 12px; border-radius: 10px; font-weight: 900; font-size: 16px; }
-        .info-dot { display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; border: 1px solid currentColor; border-radius: 9999px; font-size: 9px; font-weight: 700; line-height: 1; }
+        .info-label { position: relative; display: inline-flex; align-items: center; gap: .3em; }
+        .info-btn { display: inline-flex; align-items: center; justify-content: center; padding: 5px; margin: -5px; background: none; border: 0; color: inherit; line-height: 0; cursor: pointer; }
+        .info-btn svg { width: var(--info-size, .92em); height: var(--info-size, .92em); display: block; transform: translateY(var(--info-nudge, .05em)); }
+        .font-bold .info-label { --info-nudge: 0em; }   /* 굵은 제목(순 수익)은 글자 중심이 살짝 높아 보정값 없음 */
         .info-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: max-content; max-width: 240px; background: #2d2d2d; border: 1px solid #3d3d3d; color: #ddd; font-size: 10px; font-weight: 500; line-height: 1.45; padding: 6px 10px; border-radius: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.45); }
         .blue-roi-badge { background-color: #38bdf8; color: #fff; padding: 6px 12px; border-radius: 10px; font-weight: 900; font-size: 16px; }
 
@@ -426,7 +429,7 @@
                     const totalLoanInterest = reLoans.reduce((s,x)=>s+Number(x.total || 0), 0);
                     const buyPrice = 660000000; const taxPrice = 10164000;
                     const INITIAL_CAPITAL = 55000000;      // 초기자금
-                    const CAPITAL_RECOVERED = 100000000;   // 자본회수액
+                    const capitalRecovered = reSet.recovered !== undefined ? Number(reSet.recovered) : 100000000;   // 자본회수액 (연필로 수정, 기본 1억)
                     const BUY_DATE = '2021-08-25';         // 매수일 (CAGR 보유기간 시작일)
                     const jeonse = Number(reSet.jeonse || 0);
                     const loanAmt = Number(reSet.loan || 0);
@@ -439,7 +442,7 @@
                     // 순 투입 자기자본 = 순자산 - 순 수익
                     const netEquity = netAsset - netProfit;
                     // 총 투입원금 = 순 투입 자기자본 + 자본회수액
-                    const totalPrincipal = netEquity + CAPITAL_RECOVERED;
+                    const totalPrincipal = netEquity + capitalRecovered;
                     const isPlus = netProfit >= 0;
                     const accentCls = isPlus ? 'text-[#ff4e4e]' : 'text-sky-400';
 
@@ -482,42 +485,34 @@
                             <div class="bull-card px-3.5 py-3">
                                 <div class="text-[10px] text-[#888] leading-4">구매금액</div>
                                 <div class="text-[15px] font-black text-white leading-6 mt-0.5">₩ ${buyPrice.toLocaleString()}</div>
-                                <div class="text-[9px] text-[#666] leading-3 mt-1">취득세: ₩ ${taxPrice.toLocaleString()}</div>
-                                <div class="text-[9px] text-[#666] leading-3 mt-1">초기자금: ₩ ${INITIAL_CAPITAL.toLocaleString()}</div>
+                                <div class="grid mt-1 gap-y-1 text-[9px] text-[#666] leading-3 tabular-nums" style="grid-template-columns:auto auto; justify-content:start; column-gap:3px">
+                                    <span>취득세:</span><span>₩ ${taxPrice.toLocaleString()}</span>
+                                    <span>초기자금:</span><span>₩ ${INITIAL_CAPITAL.toLocaleString()}</span>
+                                </div>
                             </div>
                             ${reCard('전세금액', jeonse, 'jeonse')}
                             ${reCard('대출액', loanAmt, 'loan')}
                             ${reCard('대출이자', totalLoanInterest)}
                             ${reCard('실거래가', actualPrice, 'actual')}
-                            ${reCard('순자산', netAsset)}
+                            ${reCard(infoLabel('순자산', 'pop-asset', '실거래가-전세금액-대출액'), netAsset)}
                             <div class="bull-card px-3.5 py-3 col-span-2 flex items-center gap-3">
                                 <div>
-                                    <div class="relative inline-flex items-center gap-1.5 text-[#888]">
-                                        <span class="text-[10px] leading-4">순 투입 자기자본</span>
-                                        <button type="button" onclick="toggleInfoPop('pop-equity', event)" class="p-1 -m-1" aria-label="순 투입 자기자본 설명"><span class="info-dot">i</span></button>
-                                        <div id="pop-equity" class="info-pop hidden">수익과 무관한 순수 투입비용(순자산-순수익)</div>
-                                    </div>
+                                    <div class="text-[10px] leading-4 text-[#888]">${infoLabel('순 투입 자기자본', 'pop-equity', '수익과 무관한 순수 투입비용(순자산-순수익)')}</div>
                                     <div class="text-lg font-black text-white leading-7 mt-0.5">₩ ${netEquity.toLocaleString()}</div>
                                 </div>
-                                <div class="ml-auto flex flex-col gap-1 text-right">
-                                    <div class="flex items-center justify-end gap-2">
-                                        <span class="text-[10px] text-[#888]">자본회수액</span>
-                                        <span class="text-[11px] font-bold text-[#aaa]">₩ ${CAPITAL_RECOVERED.toLocaleString()}</span>
-                                    </div>
-                                    <div class="flex items-center justify-end gap-2">
-                                        <span class="text-[10px] text-[#888]">총 투입원금</span>
-                                        <span class="text-[11px] font-bold text-[#aaa]">₩ ${totalPrincipal.toLocaleString()}</span>
-                                    </div>
+                                <div class="ml-auto grid items-center gap-y-1 tabular-nums" style="grid-template-columns:auto auto auto; column-gap:8px">
+                                    <span class="text-[10px] text-[#888] text-right">자본회수액</span>
+                                    <span class="text-[11px] font-bold text-[#aaa] text-left">₩ ${capitalRecovered.toLocaleString()}</span>
+                                    <button onclick="editREField('recovered')" class="text-[9px] leading-none text-[#aaa] active:text-[#fff] p-1 -m-1" aria-label="자본회수액 수정"><i class="fa-solid fa-pen"></i></button>
+                                    <span class="text-[10px] text-[#888] text-right">총 투입원금</span>
+                                    <span class="text-[11px] font-bold text-[#aaa] text-left">₩ ${totalPrincipal.toLocaleString()}</span>
+                                    <span></span>
                                 </div>
                             </div>
                             <div class="bull-card px-4 py-3.5 col-span-2 relative ${isPlus ? 'bg-gradient-to-br from-[#1a1a1a] to-[#251414]' : 'bg-gradient-to-br from-[#1a1a1a] to-[#141d25]'}">
                                 <div class="flex items-start justify-between gap-3">
                                     <div>
-                                        <div class="relative inline-flex items-center gap-1.5 ${accentCls}">
-                                            <span class="text-[11px] font-bold leading-4">순 수익</span>
-                                            <button type="button" onclick="toggleInfoPop('pop-profit', event)" class="p-1 -m-1 opacity-80" aria-label="순 수익 설명"><span class="info-dot">i</span></button>
-                                            <div id="pop-profit" class="info-pop hidden">(실거래가-구매금액-취득세-대출이자)</div>
-                                        </div>
+                                        <div class="text-[11px] font-bold leading-4 ${accentCls}">${infoLabel('순 수익', 'pop-profit', '(실거래가-구매금액-취득세-대출이자)')}</div>
                                         <div class="text-2xl font-black leading-8 ${accentCls}">${isPlus ? '+' : ''}₩ ${netProfit.toLocaleString()}</div>
                                     </div>
                                     <div class="text-right text-[9px] text-[#888] leading-[13px] pt-0.5">수익률 (CAGR)<br>보유 ${holdYears.toFixed(1)}년</div>
@@ -838,8 +833,8 @@
             const ctx = canvas.getContext('2d');
             const pointColors = data.map(v => v >= 0 ? '#C62828' : '#1565C0');
             mainChartInst = new Chart(ctx, {
-                type: 'line', data: { labels: labels, datasets: [{ data: data, borderColor: 'rgba(160,160,160,0.3)', backgroundColor: 'rgba(160,160,160,0.03)', borderWidth: 2, pointBackgroundColor: pointColors, pointBorderColor: pointColors, pointRadius: 6, fill: true }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: true, align: 'top', color: '#fff', backgroundColor: '#2d2d2d', borderRadius: 6, font:{weight:'bold', size:10}, formatter: (v)=>v+'%' } }, scales: { x:{grid:{color:'#252525'}, ticks:{color:'#888'}}, y:{grid:{color:'#252525'}, ticks:{color:'#888'}} } }, plugins: [ChartDataLabels]
+                type: 'line', data: { labels: labels, datasets: [{ data: data, borderColor: 'rgba(160,160,160,0.3)', backgroundColor: 'rgba(160,160,160,0.03)', borderWidth: 2, pointBackgroundColor: pointColors, pointBorderColor: pointColors, pointRadius: 3, pointHoverRadius: 5, fill: true }] },
+                options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 14, right: 6 } }, plugins: { legend: { display: false }, datalabels: { display: true, align: 'top', anchor: 'center', offset: 3, color: '#fff', textStrokeColor: '#1a1a1a', textStrokeWidth: 3, font:{weight:'bold', size:9}, formatter: (v)=>v+'%' } }, scales: { x:{grid:{color:'#252525'}, ticks:{color:'#888'}}, y:{grid:{color:'#252525'}, ticks:{color:'#888'}} } }, plugins: [ChartDataLabels]
             });
         }
 
@@ -980,8 +975,9 @@
 
         function editREField(field) {
             const current = JSON.parse(DB.get(KEYS.re.settings)) || {jeonse:0, loan:0, actual:0, invest:0};
-            const labels = {jeonse:'전세금액', loan:'대출액', actual:'실거래가', invest:'대출상환 금액'};
-            const val = current[field] || 0;
+            const labels = {jeonse:'전세금액', loan:'대출액', actual:'실거래가', invest:'대출상환 금액', recovered:'자본회수액'};
+            const defaults = {recovered: 100000000};
+            const val = current[field] !== undefined ? Number(current[field]) : (defaults[field] || 0);
             let res = prompt((labels[field]||field) + " 변경할 금액을 입력해 주세요:", val.toLocaleString());
             if(res !== null) {
                 current[field] = Number(res.replace(/[^0-9.-]/g, ''));
@@ -1175,6 +1171,11 @@
         function fmtPct(v) {
             if(v === null || !isFinite(v)) return '–';
             return (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+        }
+
+        const INFO_SVG = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7.1" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="4.8" r="1.05" fill="currentColor"/><rect x="7.2" y="6.8" width="1.6" height="5.2" rx=".8" fill="currentColor"/></svg>`;
+        function infoLabel(text, popId, popText) {
+            return `<span class="info-label"><span>${text}</span><button type="button" class="info-btn" onclick="toggleInfoPop('${popId}', event)" aria-label="${text} 설명">${INFO_SVG}</button><span id="${popId}" class="info-pop hidden">${popText}</span></span>`;
         }
 
         function toggleInfoPop(id, e) {
